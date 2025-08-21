@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Rico Dichavando • Italodichava</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { display:flex; flex-direction:column; min-height:100vh; background:radial-gradient(circle at top,#00111c,#000); font-family:'Orbitron', sans-serif; color:#0ff;}
+header { padding:20px; background:rgba(0,0,0,0.6); display:flex; justify-content:space-between; font-size:1.2rem; font-weight:700; text-shadow:0 0 6px #0ff;}
+.main-content { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:20px;}
+.slot-container { display:grid; grid-template-columns:repeat(3,80px); gap:12px; margin-bottom:20px;}
+.slot { width:80px; height:80px; background:rgba(0,0,0,0.7); border:2px solid #0ff; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:3rem; color:#0ff; box-shadow:0 0 12px #0ff;}
+.controls { margin:10px; }
+.btn { margin:8px; padding:16px 36px; font-size:1.2rem; font-weight:700; background:rgba(0,255,255,0.1); color:#0ff; border:2px solid #0ff; border-radius:12px; cursor:pointer; text-shadow:0 0 8px #0ff; transition: transform .2s ease, background .3s ease; box-shadow:0 0 12px #0ff;}
+.btn:hover:not(:disabled) { transform:scale(1.1); background:rgba(0,255,255,0.2);}
+.btn:disabled { opacity:.4; cursor:not-allowed; }
+#msg { font-size:1.3rem; margin-top:12px; min-height:1.5em; text-shadow:0 0 8px #0ff; }
+.deposit-btn { display:inline-flex; align-items:center; background:linear-gradient(135deg,#25d366,#128c7e); color:white; font-size:18px; font-weight:bold; padding:15px 25px; border-radius:12px; text-decoration:none; box-shadow:0px 4px 8px rgba(0,0,0,0.2); gap:12px; transition:all 0.2s ease-in-out;}
+.deposit-btn:hover { transform:scale(1.05); box-shadow:0px 6px 12px rgba(0,0,0,0.3);}
+.deposit-btn:active { transform:scale(0.97);}
+.notification { position: fixed; bottom: 10px; left: 10px; color:#0f6; font-size:1rem; background: rgba(0,255,100,0.1); padding:12px 18px; border-radius:12px; border:1px solid #0f6; text-shadow:0 0 4px #0f6; z-index:300; animation:fadeInOut 4s ease-in-out infinite;}
+@keyframes fadeInOut {0% { opacity:0; transform:translateY(10px);} 10% { opacity:1; transform:translateY(0);} 90% { opacity:1;} 100% { opacity:0; transform:translateY(-10px);}}
+#pixModal { display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:rgba(0,0,0,0.9); padding:30px; border-radius:16px; box-shadow:0 0 30px #0f6; width:90%; max-width:360px; text-align:center; z-index:100;}
+#pixModal input { width:100%; padding:12px; border:none; border-radius:8px; background:#222; color:#0f6; font-size:1rem; margin-top:10px;}
+#pixModal button { margin-top:12px; padding:12px 20px; cursor:pointer;}
+</style>
+</head>
+<body>
+<header>
+  <div>Pontos: <span id="pts">10</span></div>
+  <div>Saldo: R$ <span id="bal">0.00</span></div>
+  <div id="onlineCount">🔴 300 pessoas online</div>
+</header>
+
+<div class="main-content">
+  <div class="slot-container" id="slotContainer">
+    <div class="slot">💸</div><div class="slot">❌</div><div class="slot">💰</div>
+    <div class="slot">💸</div><div class="slot">❌</div><div class="slot">💰</div>
+    <div class="slot">💸</div><div class="slot">❌</div><div class="slot">💰</div>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="spin">Girar</button>
+    <button class="btn" id="withdraw">Retirar</button>
+  </div>
+  <div id="msg">Vamos jogar!</div>
+
+  <!-- Botão real PagBank R$5 -->
+  <a href="https://pag.ae/7_YzGfz65" target="_blank" class="deposit-btn" id="depositBtn">
+    💰 Depositar R$5
+  </a>
+</div>
+
+<!-- Modal Pix -->
+<div id="pixModal">
+  <p>Informe seu Gmail ou chave Pix:</p>
+  <input type="text" id="pixKey" placeholder="Digite aqui"/>
+  <button id="completePixBtn" class="btn">Sacar</button>
+</div>
+
+<div class="notification" id="saqueMsg">Patrique sacou R$100</div>
+
+<script>
+const emojis=["💸","❌","💰","🏆","🤑","🎉"];
+const slots=document.querySelectorAll('.slot');
+const spinBtn=document.getElementById('spin');
+const withdrawBtn=document.getElementById('withdraw');
+const msg=document.getElementById('msg');
+const ptsEl=document.getElementById('pts');
+const balEl=document.getElementById('bal');
+const onlineCount=document.getElementById('onlineCount');
+const saqueMsg=document.getElementById('saqueMsg');
+const pixModal=document.getElementById('pixModal');
+const pixKeyInput=document.getElementById('pixKey');
+const completePixBtn=document.getElementById('completePixBtn');
+const depositBtn=document.getElementById('depositBtn');
+
+let points=10, balance=0, depositFeito=false;
+
+// Pessoas online aleatórias
+setInterval(()=>{
+  const online=Math.floor(Math.random()*(430-200+1))+200;
+  onlineCount.textContent=`🔴 ${online} pessoas online`;
+},3000);
+
+// Mensagens de saque aleatórias
+const nomes=["Patrique","Ana","Junior","Fabrício","Matheus","Jéssica","Felipe","Maria Clara","Lucas"];
+setInterval(()=>{
+  const nome=nomes[Math.floor(Math.random()*nomes.length)];
+  const valor=Math.floor(Math.random()*900)+1;
+  saqueMsg.textContent=`${nome} sacou R$${valor}`;
+},4000);
+
+// Botões do jogo
+spinBtn.onclick=()=>spinSlots();
+withdrawBtn.onclick=()=>{
+  if(balance<=0){ alert("Você não tem saldo para sacar."); return; }
+  pixModal.style.display="block";
+};
+pixModal.addEventListener("click",e=>{if(e.target===pixModal) pixModal.style.display="none";});
+
+// Botão sacar
+completePixBtn.onclick=()=>{
+  const chave=pixKeyInput.value.trim();
+  if(!chave){ alert("Digite Gmail ou Pix."); return; }
+  pixModal.style.display="none";
+  if(depositFeito){
+    alert(`Saque de R$${balance.toFixed(2)} realizado com sucesso para ${chave}!`);
+    balance=0; balEl.textContent=balance.toFixed(2);
+  } else {
+    alert("É necessário depositar R$5 para liberar o Pix.");
+  }
+};
+
+// Simular depósito PagBank liberando bônus
+depositBtn.onclick=()=>{
+  points+=10;
+  depositFeito=true;
+  ptsEl.textContent=points;
+  alert("Depósito confirmado! +10 pontos adicionados para jogar.");
+};
+
+function updateButtons(){
+  spinBtn.disabled=points<=0;
+  withdrawBtn.disabled=balance<=0;
+  if(points<=0) msg.textContent="Sem pontos! Fim de jogo.";
+}
+
+function spinSlots(){
+  if(points<=0) return;
+  spinBtn.disabled=true;
+  msg.textContent="Girando...";
+  let willWin=Math.random()<0.4;
+  let duration=willWin?7000:2000;
+  let start=null;
+  function step(ts){
+    if(!start) start=ts;
+    let elapsed=ts-start;
+    let progress=elapsed/duration;
+    let speed=willWin?15+85*(1-progress):40+100*(1-progress);
+    if(!step.last || elapsed-step.last>=speed){
+      slots.forEach(s=>s.textContent=emojis[Math.floor(Math.random()*emojis.length)]);
+      step.last=elapsed;
+    }
+    if(elapsed<duration) requestAnimationFrame(step);
+    else{
+      let final=[];
+      for(let i=0;i<9;i++){
+        let emoji=willWin && i<=2?"💰":emojis[Math.floor(Math.random()*emojis.length)];
+        slots[i].textContent=emoji; final.push(emoji);
+      }
+      checkResult(final);
+      spinBtn.disabled=false;
+    }
+  }
+  requestAnimationFrame(step);
+}
+
+function checkResult(arr){
+  const lines=[[0,1,2],[3,4,5],[6,7,8]];
+  let win=false;
+  for(let [a,b,c] of lines){
+    if(arr[a]===arr[b] && arr[b]===arr[c]){
+      let premios=[40,50,80,100];
+      let prize=premios[Math.floor(Math.random()*premios.length)];
+      balance+=prize; points-=1;
+      balEl.textContent=balance.toFixed(2);
+      msg.textContent=`🎉 Você ganhou R$${prize}! 🎉`;
+      win=true;
+      break;
+    }
+  }
+  if(!win){ points-=1; msg.textContent="Sem vitória, tente de novo.";}
+  ptsEl.textContent=points;
+  updateButtons();
+}
+</script>
+</body>
+</html>
